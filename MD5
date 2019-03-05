@@ -1,0 +1,16 @@
+aa4d12c79505721c2ffe50e33a7bad23 *DESCRIPTION
+f42ba1e9b55952f0a54b5887f9b111df *NAMESPACE
+bc3e34942e2c8bb9b9cc49a43e1f48bc *R/MI.glm.r
+a958b59f6da525302497effd635bddca *R/MR.mean.r
+fdf8bfe992ae306079b84af31729e2dd *R/MR.quantile.r
+7d1ee3ad33793a754246fdce12672f78 *R/MR.quantreg.r
+91ca1a7c91dd90191d43b311f8fb52fa *R/MR.reg.r
+50e819a2fc70981d66d887158dc3423c *R/def.glm.r
+57320bb110283789cf101944087d5755 *R/def.quantreg.r
+019cffcc358898550d682ca4c07a8dc4 *R/eval.glm.r
+fa16b4aa175a74ece78ec543f9ba7a45 *man/MR.mean.Rd
+cad2d3fe67ac8f22aad861205b0114c0 *man/MR.quantile.Rd
+0ec891d845a60c31d17066277bf9c63a *man/MR.quantreg.Rd
+390ab17f67acd209f922f6db5585f95d *man/MR.reg.Rd
+25036565d2af7c343ffd0f1514ad3b3d *man/def.glm.Rd
+7c50325c0e454899a965e30ec1afaab3 *man/def.quantreg.Rd
