@@ -4,27 +4,31 @@
 \alias{MR.mean}
 \title{Multiply Robust Estimation of the Marginal Mean}
 \usage{
-MR.mean(reg.model = NULL, mis.model = NULL, data, bootstrap = FALSE,
-  bootstrap.size = 500, alpha = 0.05)
+MR.mean(response, reg.model = NULL, mis.model = NULL, data,
+  bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
 }
 \arguments{
+\item{response}{The response variable of interest whose marginal mean is to be estimated.}
+
 \item{reg.model}{A list of outcome regression models defined by \code{\link{def.glm}}.}
 
 \item{mis.model}{A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.}
 
 \item{data}{A data frame with missing data encoded as \code{NA}.}
 
-\item{bootstrap}{Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the marginal mean. Default is \code{FALSE}.}
+\item{bootstrap}{Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the marginal mean.}
 
-\item{bootstrap.size}{A numeric value. Number of bootstrap resamples generated if \code{bootstrap} is \code{TRUE}. Default is 500.}
+\item{bootstrap.size}{A numeric value. Number of bootstrap resamples generated if \code{bootstrap = TRUE}.}
 
 \item{alpha}{Significance level used to construct the 100(1 - \code{alpha})\% Wald confidence interval.}
 }
 \value{
-\item{\code{Estimate}}{The estimated value of the marginal mean. If \code{bootstrap} is \code{TRUE}, bootstrap standard error \code{SE} of the estimate and a Wald confidence interval are provided.}
+\item{\code{mu}}{The estimated value of the marginal mean.}
+\item{\code{SE}}{The bootstrap standard error of \code{mu} when \code{bootstrap = TRUE}.}
+\item{\code{CI}}{A Wald-type confidence interval based on \code{mu} and \code{SE} when \code{bootstrap = TRUE}.}
 }
 \description{
-\code{MR.mean()} is used to estimate the marginal mean of a variable which is subject to missingness. Multiple missingness probability models and outcome regression models can be included.
+\code{MR.mean()} is used to estimate the marginal mean of a variable which is subject to missingness. Multiple missingness probability models and outcome regression models can be accommodated.
 }
 \examples{
 # Simulated data set
@@ -33,22 +37,24 @@ n <- 400
 gamma0 <- c(1, 2, 3)
 alpha0 <- c(-0.8, -0.5, 0.3)
 X <- runif(n, min = -2.5, max = 2.5)
-X.2 <- X ^ 2
-exp.X <- exp(X)
-p.miss <- 1 / (1 + exp(alpha0[1] + alpha0[2] * X + alpha0[3] * X.2))
-R <- rbinom(n, size = 1, prob = 1 - p.miss)
-a.x <- gamma0[1] + gamma0[2] * X + gamma0[3] * exp.X
-Y <- rnorm(n, a.x, sd = sqrt(4 * X.2 + 2))
-dat <- data.frame(X, X.2, exp.X, Y)
-dat[R == 0, 4] <- NA
+p.mis <- 1 / (1 + exp(alpha0[1] + alpha0[2] * X + alpha0[3] * X ^ 2))
+R <- rbinom(n, size = 1, prob = 1 - p.mis)
+a.x <- gamma0[1] + gamma0[2] * X + gamma0[3] * exp(X)
+Y <- rnorm(n, a.x, sd = sqrt(4 * X ^ 2 + 2))
+dat <- data.frame(X, Y)
+dat[R == 0, 2] <- NA
 
 # Define the outcome regression models and missingness probability models
-reg1 <- def.glm(formula = Y ~ X + exp.X, family = gaussian)
-reg2 <- def.glm(formula = Y ~ X + X.2, family = gaussian)
-mis1 <- def.glm(formula = R ~ X + X.2, family = binomial(link = logit))
-mis2 <- def.glm(formula = R ~ X + exp.X, family = binomial(link = cloglog))
-est <- MR.mean(reg.model = list(reg1, reg2), mis.model = list(mis1, mis2), data = dat)
+reg1 <- def.glm(formula = Y ~ X + exp(X), family = gaussian)
+reg2 <- def.glm(formula = Y ~ X + X ^ 2, family = gaussian)
+mis1 <- def.glm(formula = R ~ X + X ^ 2, family = binomial(link = logit))
+mis2 <- def.glm(formula = R ~ X + exp(X), family = binomial(link = cloglog))
+est <- MR.mean(response = Y, reg.model = list(reg1, reg2), 
+               mis.model = list(mis1, mis2), data = dat)
+est$mu
 }
 \references{
 Han, P. and Wang, L. (2013). Estimation with missing data: beyond double robustness. \emph{Biometrika}, \strong{100}(2), 417--430.
+
+Han, P. (2014). A further study of the multiply robust estimator in missing data analysis. \emph{Journal of Statistical Planning and Inference}, \strong{148}, 101--110.
 }

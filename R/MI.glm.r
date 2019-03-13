@@ -31,8 +31,8 @@ MI.glm <- function(imp.model, L, data)
         }
         
 		else if (fam == "binomial"){
-		  if (any(m < 0) | any(m > 1)) 
-            stop(paste("imputation model ", v, " in list ", k, " is not appropriate, estimated probability should be within [0,1] for 'binomial' family; specify a different imputation model"))
+		  # if (any(m < 0) | any(m > 1)) 
+          #   stop(paste("imputation model ", v, " in list ", k, " is not appropriate, estimated probability should be within [0,1] for 'binomial' family; specify a different imputation model"))
           if (any(wts.tmp %% 1 != 0))
             stop("cannot simulate from non-integer prior.weights")
 
@@ -47,8 +47,8 @@ MI.glm <- function(imp.model, L, data)
         }
         
 		else if (fam == "poisson"){
-		  if (any(m <= 0)) 
-            stop(paste("imputation model ", v, " in list ", k, " is not appropriate, estimated mean should be positive for 'Poisson' family; specify a different imputation model"))
+		  # if (any(m <= 0)) 
+          #   stop(paste("imputation model ", v, " in list ", k, " is not appropriate, estimated mean should be positive for 'Poisson' family; specify a different imputation model"))
 		  imp <- rpois(n, lambda = m)
 		}
 
@@ -57,8 +57,8 @@ MI.glm <- function(imp.model, L, data)
           #   stop("need CRAN package 'MASS' for simulation from the 'Gamma' family")
           # shape <- MASS::gamma.shape(imp.modelkv)$alpha * wts.tmp
 		  shape <- 1 / summary(imp.modelkv)$dispersion * wts.tmp
-          if (any(shape <= 0) | any(shape / m <= 0)) 
-		    stop(paste("imputation model ", v, " in list ", k, " is not appropriate, estimated shape and rate should be positive for 'Gamma' family; specify a different imputation model"))
+          # if (any(shape <= 0) | any(shape / m <= 0)) 
+		  #   stop(paste("imputation model ", v, " in list ", k, " is not appropriate, estimated shape and rate should be positive for 'Gamma' family; specify a different imputation model"))
           imp <- rgamma(n, shape = shape, rate = shape / m)
         }
 
@@ -66,8 +66,8 @@ MI.glm <- function(imp.model, L, data)
           if(!requireNamespace("SuppDists", quietly = TRUE))
             stop("need CRAN package 'SuppDists' for simulation from the 'inverse.gaussian' family")
 		  disp <- summary(imp.modelkv)$dispersion
-          if (any(m <= 0) | any(disp <= 0)) 
-		    stop(paste("imputation model ", v, " in list ", k, " is not appropriate, estimated mean should be positive for 'inverse.gaussian' family; specify a different imputation model"))
+          # if (any(m <= 0) | any(disp <= 0)) 
+		  #   stop(paste("imputation model ", v, " in list ", k, " is not appropriate, estimated mean should be positive for 'inverse.gaussian' family; specify a different imputation model"))
           imp <- SuppDists::rinvGauss(n, nu = m, lambda = wts.tmp / disp)
         }
 		

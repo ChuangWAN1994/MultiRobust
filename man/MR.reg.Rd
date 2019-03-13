@@ -2,78 +2,81 @@
 % Please edit documentation in R/MR.reg.r
 \name{MR.reg}
 \alias{MR.reg}
-\title{Multiply Robust Estimation of the Regression Coefficients}
+\title{Multiply Robust Estimation for (Mean) Regression}
 \usage{
-MR.reg(reg.model, imp.model = NULL, mis.model = NULL, L = 10, data,
+MR.reg(model, imp.model = NULL, mis.model = NULL, L = 30, data,
   bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
 }
 \arguments{
-\item{reg.model}{The regression model of interest, defined by \code{\link{def.glm}}.}
+\item{model}{The regression model of interest, defined by \code{\link{def.glm}}.}
 
-\item{imp.model}{A list of imputation models defined by \code{\link{def.glm}}. Within the list, each element is a list of imputation models for the missing variables. One and only one model is allowed to be specified for each missing variable. Separate multiple working models for the same variable into different lists.}
+\item{imp.model}{A list of possibly multiple lists of the form \code{list(list.1, list.2, ..., list.K)}, where \code{K} is the total number of different imputation models. For the \emph{k}-th imputation model, \code{list.k} is a list of possibly multiple models, each of which is defined by \code{\link{def.glm}} and imputes one single missing variable marginally. See details.}
 
 \item{mis.model}{A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.}
 
-\item{L}{Number of random draws from the estimated imputation model.}
+\item{L}{Number of imputations.}
 
 \item{data}{A data frame with missing data encoded as \code{NA}.}
 
-\item{bootstrap}{Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the regression coefficients. Default is \code{FALSE}.}
+\item{bootstrap}{Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the regression coefficients.}
 
-\item{bootstrap.size}{A numeric value. Number of bootstrap resamples generated if \code{bootstrap} is \code{TRUE}. Default is 500.}
+\item{bootstrap.size}{A numeric value. Number of bootstrap resamples generated if \code{bootstrap = TRUE}.}
 
-\item{alpha}{Significance level used to construct the 100(1 - alpha)\% Wald confidence interval.}
+\item{alpha}{Significance level used to construct the 100(1 - \code{alpha})\% Wald confidence interval.}
 }
 \value{
-\item{\code{Estimate}}{A table containing the estimated regression coefficients. If \code{bootstrap} is \code{TRUE}, bootstrap standard errors \code{SE} of the estimates and Wald confidence intervals are also included.}
-\item{\code{fit}}{A fitted object of class inheriting from \code{glm} on \code{reg.model}.}
+\item{\code{coefficients}}{The estimated regression coefficients.}
+\item{\code{SE}}{The bootstrap standard error of \code{coefficients} when \code{bootstrap = TRUE}.}
+\item{\code{CI}}{A Wald-type confidence interval based on \code{coefficients} and \code{SE} when \code{bootstrap = TRUE}.}
+\item{\code{fit}}{A fitted object inheriting from class "\code{glm}" on \code{model}.}
 }
 \description{
-\code{MR.reg()} is used to estimate the regression coefficients of a generalized linear model. Both missing response and/or missing covariates are allowed. Multiple missingness probability models and imputation models are allowed.
+\code{MR.reg()} is used for (mean) regression under generalized linear models with missing responses and/or missing covariates. Multiple missingness probability models and imputation models are allowed.
+}
+\details{
+The function \code{MR.reg()} currently deals with data with one missingness pattern. When multiple variables are subject to missingness, their values are missing simultaneously. The methods in Han (2016) and Zhang and Han (2019) specify an imputation model by modeling the joint distribution of the missing variables conditional on the fully observed variables. In contrast, the function \code{MR.reg()} specifies an imputation model by separately modeling the marginal distribution of each missing variable conditional on the fully observed variables. These marginal distribution models for different missing variables constitute one joint imputation model. Different imputation models do not need to model the marginal distribution of each missing variable differently.
 }
 \examples{
-# Missing covariate and missing response simultaneously
 # Simulated data set
 set.seed(123)
 n <- 400
 gamma0 <- c(1, 2, 3)
 alpha0 <- c(-0.8, -0.5, 0.3)
-S <- runif(n, min = -2.5, max = 2.5) # auxiliary information
-S.2 <- S ^ 2
+S <- runif(n, min = -2.5, max = 2.5) # auxiliary variables
 X1 <- rbinom(n, size = 1, prob = 0.5) # covariate X1
 X2 <- rexp(n) # covariate X2
-p.obs <- 1 / (1 + exp(alpha0[1] + alpha0[2] * S + alpha0[3] * S.2)) # missingness probability
+p.obs <- 1 / (1 + exp(alpha0[1] + alpha0[2] * S + alpha0[3] * S ^ 2)) # non-missingness probability
 R <- rbinom(n, size = 1, prob = p.obs)
 a.x <- gamma0[1] + gamma0[2] * X1 + gamma0[3] * X2
 Y <- rnorm(n, a.x)
 dat <- data.frame(S, X1, X2, Y)
-dat[R == 0, c(2, 4)] <- NA # X1 and Y are missing
+dat[R == 0, c(2, 4)] <- NA # X1 and Y may be missing
 
-# Estimating regression coefficients
 # model of interest
 reg <- def.glm(formula = Y ~ X1 + X2, family = gaussian)
-# imputation models for X1
+# marginal imputation models for X1
 impX1.1 <- def.glm(formula = X1 ~ S, family = binomial(link = logit))
 impX1.2 <- def.glm(formula = X1 ~ S + X2, family = binomial(link = cloglog))
-# imputation models for Y
+# marginal imputation models for Y
 impY.1 <- def.glm(formula = Y ~ S, family = gaussian)
 impY.2 <- def.glm(formula = Y ~ S + X2, family = gaussian)
 # missingness probability models
-mis1 <- def.glm(formula = R ~ S + S.2, family = binomial(link = logit))
-mis2 <- def.glm(formula = R ~ S.2, family = binomial(link = cloglog))
+mis1 <- def.glm(formula = R ~ S + S ^ 2, family = binomial(link = logit))
+mis2 <- def.glm(formula = R ~ S ^ 2, family = binomial(link = cloglog))
+# this example considers the following K = 3 imputation models for imputing the missing (X1, Y)
+imp1 <- list(impX1.1, impY.1)
+imp2 <- list(impX1.1, impY.2)
+imp3 <- list(impX1.2, impY.1)
 
-imp1 <- list(impX1.1, impY.1) # 1st set of imputation models for X1 and Y
-imp2 <- list(impX1.2, impY.2) # 2nd set of imputation models for X1 and Y
-imp3 <- list(impX1.1, impY.2) # 3rd set of imputation models for X1 and Y
-imp4 <- list(impX1.2, impY.1) # 4th set of imputation models for X1 and Y
-
-results <- MR.reg(reg.model = reg, imp.model = list(imp1, imp2, imp3, imp4),
-                  mis.model = list(mis1, mis2), L = 5, data = dat)
+results <- MR.reg(model = reg, imp.model = list(imp1, imp2, imp3),
+                  mis.model = list(mis1, mis2), L = 10, data = dat)
+results$coefficients
+summary(results$fit)
 }
 \references{
 Han, P. (2014). Multiply robust estimation in regression analysis with missing data. \emph{Journal of the American Statistical Association}, \strong{109}(507), 1159--1173.
 
 Han, P. (2016). Combining inverse probability weighting and multiple imputation to improve robustness of estimation. \emph{Scandinavian Journal of Statistics}, \strong{43}, 246--260.
 
-Zhang, S. and Han, P. (2018). A simple implementation of multiply robust estimation for GLMs with missing data. Submitted.
+Zhang, S. and Han, P. (2019). A simple implementation of multiply robust estimation for GLMs with missing data. Unpublished manuscript.
 }

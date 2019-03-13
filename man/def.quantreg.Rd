@@ -4,14 +4,12 @@
 \alias{def.quantreg}
 \title{Define a Linear Quantile Regression Model}
 \usage{
-def.quantreg(formula, tau = 0.5, subset, weights = NULL, ...)
+def.quantreg(formula, tau = 0.5, weights = NULL, ...)
 }
 \arguments{
 \item{formula}{The formula of the linear quantile regression model to be fitted.}
 
 \item{tau}{The quantile to be estimated, which is generally a number between 0 and 1.}
-
-\item{subset}{The subset of observations to be used.}
 
 \item{weights}{The prior weights to be used in the model.}
 
