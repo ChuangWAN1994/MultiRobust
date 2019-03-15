@@ -51,7 +51,7 @@ MREst.reg <- function(model, imp.model = NULL, mis.model = NULL, L, data)
   var.names <- ext.names.reg(imp.model = imp.model, mis.model = mis.model)
   data.sub <- data[ , unique(c(model.names, var.names$name.cov, var.names$name.res))]
   n <- NROW(data.sub)
-  if (length(unique(colSums(is.na(data.sub[ , mis.var])))) > 1)
+  if (length(unique(colSums(is.na(as.matrix(data.sub[ , mis.var], n, ))))) > 1)
     stop("the current package requires missingness to be simultaneous for different variables")
   if (any(is.na(data.sub[ , var.names$name.cov]))) stop("the covariates for imputation models and missingness models need to be fully observed")
 
@@ -174,15 +174,16 @@ MR.reg <- function(model, imp.model = NULL, mis.model = NULL, L = 30, data, boot
   # Bootstrap method for variance estimation
   if (bootstrap == TRUE){
     set.seed(bootstrap.size)
-    bs.est <- NULL
-    n <- NROW(data)
-    for (b in 1:bootstrap.size){
+    bbb <- function(x, model, imp.model, mis.model, L, data){
+      n <- NROW(data)
       bs.sample <- data[sample(1:n, n, replace = TRUE), ]
       while (any(colSums(is.na(bs.sample)) == n)) { bs.sample <- data[sample(1:n, n, replace = TRUE), ] }
-      bs.est <- rbind(bs.est, MREst.reg(model = model, imp.model = imp.model,
-	    mis.model = mis.model, L = L, data = bs.sample)$coefficients)
-    }
-    se <- apply(bs.est, 2, sd) # bootstrap standard error
+      b.est <- MREst.reg(model = model, imp.model = imp.model, mis.model = mis.model, L = L, data = bs.sample)$coefficients
+      return(b.est)
+	}
+
+	bs.est <- sapply(1:bootstrap.size, bbb, model = model, imp.model = imp.model, mis.model = mis.model, L = L, data = data)
+	se <- apply(bs.est, 1, sd) # bootstrap standard error
     estimate <- est$coefficients
     cilb <- estimate - qnorm(1 - alpha / 2) * se
     ciub <- estimate + qnorm(1 - alpha / 2) * se

@@ -4,8 +4,8 @@ ext.names <- function(reg.model, mis.model)
   K <- length(reg.model)
   nameJ <- NULL
   nameK <- NULL
-  if (J > 0) nameJ <- sapply(mis.model, function(r) all.vars(r$formula)[-1L])
-  if (K > 0) nameK <- sapply(reg.model, function(r) all.vars(r$formula)[-1L])
+  if (J > 0) nameJ <- unlist(sapply(mis.model, function(r) all.vars(r$formula)[-1L]))
+  if (K > 0) nameK <- unlist(sapply(reg.model, function(r) all.vars(r$formula)[-1L]))
   name <- unique(c(nameJ, nameK))
   return(name)
 }
@@ -17,7 +17,7 @@ ext.names.reg <- function(imp.model, mis.model)
   nameJ.cov <- NULL
   nameK.cov <- NULL
   nameK.res <- NULL
-  if (J > 0) nameJ.cov <- sapply(mis.model, function(r) all.vars(r$formula)[-1L])
+  if (J > 0) nameJ.cov <- unlist(sapply(mis.model, function(r) all.vars(r$formula)[-1L]))
   if (K > 0){
     nameK.cov <- rapply(imp.model, function(r) all.vars(r$formula)[-1L], how = "unlist")
     nameK.res <- rapply(imp.model, function(r) all.vars(r$formula)[1L], how = "unlist")

@@ -115,15 +115,16 @@ MR.mean <- function(response, reg.model = NULL, mis.model = NULL, data, bootstra
   # Bootstrap method for variance estimation
   if (bootstrap == TRUE){
     set.seed(bootstrap.size)
-    bs.est <- rep(0, bootstrap.size)
-	n <- NROW(data)
-    for (b in 1:bootstrap.size){
+    bbb <- function(response, reg.model, mis.model, data){
+      n <- NROW(data)
       bs.sample <- data[sample(1:n, n, replace = TRUE), ]
-	  while (any(colSums(is.na(bs.sample)) == n)) { bs.sample <- data[sample(1:n, n, replace = TRUE), ] }
-      bs.est[b] <- MREst.mean(response = response, reg.model = reg.model, mis.model = mis.model, data = bs.sample)
+      while (any(colSums(is.na(bs.sample)) == n)) { bs.sample <- data[sample(1:n, n, replace = TRUE), ] }
+      b.est <- MREst.mean(response = response, reg.model = reg.model, mis.model = mis.model, data = bs.sample)
+      return(b.est)
     }
 
-    se <- sd(bs.est) # bootstrap standard error
+    bs.est <- replicate(bootstrap.size, bbb(response = response, reg.model = reg.model, mis.model = mis.model, data = data))
+	se <- sd(bs.est) # bootstrap standard error
     cilb <- est - qnorm(1 - alpha / 2) * se
     ciub <- est + qnorm(1 - alpha / 2) * se
 	list(mu = est, SE = se, CI = c(cilb, ciub))
