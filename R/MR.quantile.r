@@ -68,76 +68,86 @@ MI.quantile <- function(imp.model, L, data)
   return(newdata)
 }
 
-MREst.quantile <- function(response, tau, imp.model = NULL, mis.model = NULL, L, data)
+MREst.quantile <- function(response, tau, imp.model, mis.model, moment, order, L, data)
 {
   resp <- data[ , response]
   if (!is.numeric(resp)) stop("response variable is not numeric")
   if (all(!is.na(resp))){
     warning("no missing data; sample quantile is returned")
-	return(quantile(resp, probs = tau))
+    return(list(estimate = quantile(resp, probs = tau)))
   } else {
   
   J <- length(mis.model)
   K <- length(imp.model)
-  g.length <- J + K
-
-  if (g.length == 0){
-    warning("no model is specified; sample quantile of the complete cases is returned")
-    return(quantile(resp[!is.na(resp)], probs = tau))
+  M <- length(moment)
+  g.col <- J + K + M * order
+  
+  if (g.col == 0){
+    warning("no model or moment is specified; sample quantile of the complete cases is returned")
+    return(list(estimate = quantile(resp[!is.na(resp)], probs = tau)))
   } else {
-
+  
     # names of the auxiliary variables
     aux.names <- ext.names(reg.model = imp.model, mis.model = mis.model)
+    aux.names <- unique(c(aux.names, moment))
     if (any(is.na(data[ , aux.names]))) stop("auxiliary variables being used need to be fully observed")
-	data.sub <- data[ , c(response, aux.names)]
+    data.sub <- data[ , c(response, aux.names)]
     data.sub$R <- 1 * !is.na(resp) # missingness indicator
     n <- NROW(data.sub)
     nobs <- sum(data.sub$R) # number of observed subjects
-    g.hat <- matrix(0, n, g.length)
-
+    g.hat <- matrix(0, n, g.col)
+  
     # missingness models
     if (J > 0){
-	  if (any(lapply(mis.model, function(r) all.vars(r)[1L]) != "R"))
-	    stop("the response variable of all models in 'mis.model' needs to be specified as 'R'")
+    if (any(lapply(mis.model, function(r) all.vars(r)[1L]) != "R"))
+      stop("the response variable of all models in 'mis.model' needs to be specified as 'R'")
       for (j in 1:J){
         mis.modelj <- mis.model[[j]]
         mis.modelj$data <- data.sub
         g.hat[ , j] <- eval(mis.modelj)$fitted.values
       }
     }
-
-	# imputation models
+  
+    # imputation models
     if (K > 0){
-	  if (any(lapply(imp.model, function(r) all.vars(r)[1L]) != response))
-	    stop(paste("the response variable of all models in 'reg.model' needs to be \'", response, "\'", sep = ""))
+    if (any(lapply(imp.model, function(r) all.vars(r)[1L]) != response))
+      stop(paste("the response variable of all models in 'reg.model' needs to be \'", response, "\'", sep = ""))
       MI.data <- MI.quantile(imp.model = imp.model, L = L, data = data.sub)
       for (k in 1:K){
-	    datak <- MI.data[[k]]
-	    y <- datak[ , response]
-	    quantk <- quantile(y, probs = tau)
+      datak <- MI.data[[k]]
+      y <- datak[ , response]
+      quantk <- quantile(y, probs = tau)
         nidx <- rep(1:n, L)
-	    eek <- cbind(nidx, (tau - (y - quantk < 0)))
-	    eek <- data.frame(eek)
-	    g.hat[ , J + k] <- as.matrix(aggregate(.~nidx, eek, mean))[ , -1]
+      eek <- cbind(nidx, (tau - (y - quantk < 0)))
+      eek <- data.frame(eek)
+      g.hat[ , J + k] <- as.matrix(aggregate(.~nidx, eek, mean))[ , -1]
       }
     }
-
-  g.hat <- scale(g.hat, center = TRUE, scale = FALSE)[data.sub$R == 1, ]
-  g.hat <- matrix(data = g.hat, nrow = nobs, )
-
-  # define the function to be minimized
-  Fn <- function(rho, ghat){ -sum(log(1 + ghat %*% rho)) }
-  Grd <- function(rho, ghat){ -colSums(ghat / c(1 + ghat %*% rho)) }
-  # calculate the weights
-  rho.hat <- constrOptim(theta = rep(0, NCOL(g.hat)), f = Fn, grad = Grd,
-    ui = g.hat, ci = rep(1 / nobs - 1, nobs), ghat = g.hat)$par
-  wts <- c(1 / nobs / (1 + g.hat %*% rho.hat))
-  wts <- wts / sum(wts)
-  cc <- resp[!is.na(resp)] # complete cases
-  checkf <- function(quan, tau, resp, wghts){ sum(wghts * (resp - quan) * (tau - (resp - quan <= 0))) }
-  estimate <- optimize(f = checkf, interval = c(min(cc),max(cc)),
-    tau = tau, resp = cc, wghts = wts)$minimum
-  return(estimate)
+  
+    if (M > 0){
+      for (mm in 1:M){
+        g.hat[,(J+K+(mm-1)*order+1):(J+K+mm*order)] <- sapply(1:order, function(ord, dat){dat ^ ord}, dat = data.sub[ , moment[mm]])
+      }
+    }
+    
+    g.hat <- scale(g.hat, center = TRUE, scale = FALSE)[data.sub$R == 1, ]
+    g.hat <- matrix(data = g.hat, nrow = nobs, )
+    
+    # define the function to be minimized
+    Fn <- function(rho, ghat){ -sum(log(1 + ghat %*% rho)) }
+    Grd <- function(rho, ghat){ -colSums(ghat / c(1 + ghat %*% rho)) }
+    # calculate the weights
+    rho.hat <- constrOptim(theta = rep(0, NCOL(g.hat)), f = Fn, grad = Grd, ui = g.hat, ci = rep(1 / nobs - 1, nobs), ghat = g.hat)$par
+    wts <- c(1 / nobs / (1 + g.hat %*% rho.hat))
+    wts <- wts / sum(wts)
+    cc <- as.data.frame(resp[!is.na(resp)]) # complete cases
+    names(cc) <- response
+    estimate <- quantreg::rq(formula = as.formula(paste(response, "~1", sep = "")),
+      tau = tau, weights = wts, data = cc)$coefficients
+    # checkf <- function(quan, tau, resp, wghts){ sum(wghts * (resp - quan) * (tau - (resp - quan <= 0))) }
+    # estimate <- optimize(f = checkf, interval = c(min(cc),max(cc)),
+    #   tau = tau, resp = cc, wghts = wts)$minimum
+    return(list(estimate = estimate, weights = wts))
   } # end else
   }
 }
@@ -145,10 +155,12 @@ MREst.quantile <- function(response, tau, imp.model = NULL, mis.model = NULL, L,
 #' Multiply Robust Estimation of the Marginal Quantile
 #'
 #' \code{MR.quantile()} is used to estimate the marginal quantile of a variable which is subject to missingness. Multiple missingness probability models and imputation models are allowed.
-#' @param response The response variable of interest whose marginal quantile is to be estimated. 
+#' @param response The response variable of interest whose marginal quantile is to be estimated.
 #' @param tau A numeric value in (0,1). The quantile to be estimated.
 #' @param imp.model A list of imputation models defined by \code{\link{def.glm}}.
 #' @param mis.model A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.
+#' @param moment A vector of auxiliary variables whose moments are to be calibrated.
+#' @param order A numeric value. The order of moments to be calibrated.
 #' @param L Number of imputations.
 #' @param data A data frame with missing data encoded as \code{NA}.
 #' @param bootstrap Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the estimated marginal quantile.
@@ -159,8 +171,9 @@ MREst.quantile <- function(response, tau, imp.model = NULL, mis.model = NULL, L,
 #' \item{\code{q}}{The estimated value of the marginal quantile.}
 #' \item{\code{SE}}{The bootstrap standard error of \code{q} when \code{bootstrap = TRUE}.}
 #' \item{\code{CI}}{A Wald-type confidence interval based on \code{q} and \code{SE} when \code{bootstrap = TRUE}.}
+#' \item{\code{weights}}{The calibration weights if any \code{imp.model}, \code{mis.model} or \code{moment} is specified.}
 #' @references
-#' Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. In press.
+#' Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. \strong{81}(2), 305--333.
 #' @examples
 #' # Simulated data set
 #' set.seed(123)
@@ -177,36 +190,43 @@ MREst.quantile <- function(response, tau, imp.model = NULL, mis.model = NULL, L,
 #'
 #' # Define the outcome regression models and missingness probability models
 #' imp1 <- def.glm(formula = Y ~ X + exp(X), family = gaussian)
-#' imp2 <- def.glm(formula = Y ~ X + X ^ 2, family = gaussian)
-#' mis1 <- def.glm(formula = R ~ X + X ^ 2, family = binomial(link = logit))
+#' imp2 <- def.glm(formula = Y ~ X + I(X ^ 2), family = gaussian)
+#' mis1 <- def.glm(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
 #' mis2 <- def.glm(formula = R ~ X + exp(X), family = binomial(link = cloglog))
-#' est <- MR.quantile(response = Y, tau = 0.25, imp.model = list(imp1, imp2),
-#'                    mis.model = list(mis1, mis2), L = 10, data = dat)
-#' est$q
+#' MR.quantile(response = Y, tau = 0.25, imp.model = list(imp1, imp2),
+#'             mis.model = list(mis1, mis2), L = 10, data = dat)
+#' MR.quantile(response = Y, tau = 0.25, moment = c(X), order = 2, data = dat)
 #' @export
 
-MR.quantile <- function(response, tau = 0.5, imp.model = NULL, mis.model = NULL, L = 30, data, bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
+MR.quantile <- function(response, tau = 0.5, imp.model = NULL, mis.model = NULL, moment = NULL, order = 1, 
+                        L = 30, data, bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
 {
+  if(!requireNamespace("quantreg", quietly = TRUE))
+    stop("need CRAN package 'quantreg' for quantile estimation")
   response <- as.character(substitute(response))
-  est <- MREst.quantile(response = response, tau = tau, imp.model = imp.model, mis.model = mis.model, L = L, data = data)
-
+  if (!is.null(moment)) moment <- as.character(substitute(moment))[-1]
+  est.ls <- MREst.quantile(response = response, tau = tau, imp.model = imp.model, mis.model = mis.model, moment = moment, order = order, L = L, data = data)
+  est <- est.ls$estimate
+  
   # Bootstrap method for variance estimation
   if (bootstrap == TRUE){
     set.seed(bootstrap.size)
-    bbb <- function(response, tau, imp.model, mis.model, L, data){
+    bbb <- function(response, tau, imp.model, mis.model, moment, order, L, data){
       n <- NROW(data)
       bs.sample <- data[sample(1:n, n, replace = TRUE), ]
       while (any(colSums(is.na(bs.sample)) == n)) { bs.sample <- data[sample(1:n, n, replace = TRUE), ] }
-      b.est <- MREst.quantile(response = response, tau = tau, imp.model = imp.model, mis.model = mis.model, L = L, data = bs.sample)
+      b.est <- MREst.quantile(response = response, tau = tau, imp.model = imp.model, mis.model = mis.model, moment = moment, order = order, L = L, data = bs.sample)$estimate
       return(b.est)
     }
-
-    bs.est <- replicate(bootstrap.size, bbb(response = response, tau = tau, imp.model = imp.model, mis.model = mis.model, L = L, data = data))
+  
+    bs.est <- replicate(bootstrap.size, bbb(response = response, tau = tau, imp.model = imp.model, mis.model = mis.model, moment = moment, order = order, L = L, data = data))
     se <- sd(bs.est) # bootstrap standard error
     cilb <- est - qnorm(1 - alpha / 2) * se
     ciub <- est + qnorm(1 - alpha / 2) * se
-	list(q = est, SE = se, CI = c(cilb, ciub))
+    if (is.null(imp.model) & is.null(mis.model) & is.null(moment)) return(list(q = est, SE = se, CI = c(cilb, ciub)) )
+    else return(list(q = est, SE = se, CI = c(cilb, ciub), weights = est.ls$weights))
   } else {
-    list(q = est)
+    if (is.null(imp.model) & is.null(mis.model) & is.null(moment)) return(list(q = est))
+    else return(list(q = est, weights = est.ls$weights)) 
   }
 }

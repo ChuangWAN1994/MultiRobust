@@ -5,8 +5,8 @@
 \title{Multiply Robust Estimation of the Marginal Quantile}
 \usage{
 MR.quantile(response, tau = 0.5, imp.model = NULL, mis.model = NULL,
-  L = 30, data, bootstrap = FALSE, bootstrap.size = 500,
-  alpha = 0.05)
+  moment = NULL, order = 1, L = 30, data, bootstrap = FALSE,
+  bootstrap.size = 500, alpha = 0.05)
 }
 \arguments{
 \item{response}{The response variable of interest whose marginal quantile is to be estimated.}
@@ -16,6 +16,10 @@ MR.quantile(response, tau = 0.5, imp.model = NULL, mis.model = NULL,
 \item{imp.model}{A list of imputation models defined by \code{\link{def.glm}}.}
 
 \item{mis.model}{A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.}
+
+\item{moment}{A vector of auxiliary variables whose moments are to be calibrated.}
+
+\item{order}{A numeric value. The order of moments to be calibrated.}
 
 \item{L}{Number of imputations.}
 
@@ -31,6 +35,7 @@ MR.quantile(response, tau = 0.5, imp.model = NULL, mis.model = NULL,
 \item{\code{q}}{The estimated value of the marginal quantile.}
 \item{\code{SE}}{The bootstrap standard error of \code{q} when \code{bootstrap = TRUE}.}
 \item{\code{CI}}{A Wald-type confidence interval based on \code{q} and \code{SE} when \code{bootstrap = TRUE}.}
+\item{\code{weights}}{The calibration weights if any \code{imp.model}, \code{mis.model} or \code{moment} is specified.}
 }
 \description{
 \code{MR.quantile()} is used to estimate the marginal quantile of a variable which is subject to missingness. Multiple missingness probability models and imputation models are allowed.
@@ -51,13 +56,13 @@ dat[R == 0, 2] <- NA
 
 # Define the outcome regression models and missingness probability models
 imp1 <- def.glm(formula = Y ~ X + exp(X), family = gaussian)
-imp2 <- def.glm(formula = Y ~ X + X ^ 2, family = gaussian)
-mis1 <- def.glm(formula = R ~ X + X ^ 2, family = binomial(link = logit))
+imp2 <- def.glm(formula = Y ~ X + I(X ^ 2), family = gaussian)
+mis1 <- def.glm(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
 mis2 <- def.glm(formula = R ~ X + exp(X), family = binomial(link = cloglog))
-est <- MR.quantile(response = Y, tau = 0.25, imp.model = list(imp1, imp2),
-                   mis.model = list(mis1, mis2), L = 10, data = dat)
-est$q
+MR.quantile(response = Y, tau = 0.25, imp.model = list(imp1, imp2),
+            mis.model = list(mis1, mis2), L = 10, data = dat)
+MR.quantile(response = Y, tau = 0.25, moment = c(X), order = 2, data = dat)
 }
 \references{
-Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. In press.
+Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. \strong{81}(2), 305--333.
 }

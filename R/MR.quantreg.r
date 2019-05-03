@@ -15,7 +15,7 @@ beta.imp.quant <- function(model, imp.model, L, data)
   return(betaimp)
 }
 
-MREst.quantreg <- function(model, imp.model = NULL, mis.model = NULL, L, data)
+MREst.quantreg <- function(model, imp.model, mis.model, moment, order, L, data)
 {
   model.names <- all.vars(model$formula)
   if (all(!is.na(data[ , model.names]))){
@@ -29,25 +29,26 @@ MREst.quantreg <- function(model, imp.model = NULL, mis.model = NULL, L, data)
   mis.var <- model.names[colSums(is.na(data[ , model.names])) != 0]
   J <- length(mis.model) # No. of missingness models
   K <- length(imp.model) # No. of LISTS of imputation models
+  M <- length(moment)
 
-  if (J + K == 0){
-    warning("no imputation model or missingness is specified; a complete-case analysis is returned")
+  if (J + K + M == 0){
+    warning("no imputation or missingness model or moment is specified; a complete-case analysis is returned")
     model$data <- data
     estimate <- eval(model)
     return(estimate)
   } else {
 
   var.names <- ext.names.reg(imp.model = imp.model, mis.model = mis.model)
-  data.sub <- data[ , unique(c(model.names, var.names$name.cov, var.names$name.res))]
+  data.sub <- data[ , unique(c(model.names, var.names$name.cov, var.names$name.res, moment))]
   n <- NROW(data.sub)
   if (length(unique(colSums(is.na(as.matrix(data.sub[ , mis.var], n, ))))) > 1)
     stop("the current package requires missingness to be simultaneous for different variables")
-  if (any(is.na(data.sub[ , var.names$name.cov]))) stop("the covariates for imputation models and missingness models need to be fully observed")
+  if (any(is.na(data.sub[ , unique(c(var.names$name.cov, moment))]))) stop("the covariates for imputation and missingness models and moments need to be fully observed")
 
   data.sub$R <- 1 * complete.cases(data.sub[ , mis.var]) # missingness indicator
   nobs <- sum(data.sub$R) # No. of observed subjects
-  g.hatJ <- NULL
 
+  g.hatJ <- NULL
   if (J > 0){
 	if (any(lapply(mis.model, function(r) all.vars(r)[1L]) != "R"))
       stop("the response variable of all models in 'mis.model' needs to be specified as 'R'")
@@ -80,7 +81,14 @@ MREst.quantreg <- function(model, imp.model = NULL, mis.model = NULL, L, data)
     }
   }
 
-  g.hat <- scale(cbind(g.hatJ, g.hatK), center = TRUE, scale = FALSE)[data.sub$R == 1, ]
+  g.hatM <- NULL
+  if (M > 0){
+    for (mm in 1:M){
+      g.hatM <- cbind(g.hatM, sapply(1:order, function(ord, dat){dat ^ ord}, dat = data.sub[ , moment[mm]]))
+    }
+  }
+
+  g.hat <- scale(cbind(g.hatJ, g.hatK, g.hatM), center = TRUE, scale = FALSE)[data.sub$R == 1, ]
   g.hat <- matrix(data = g.hat, nrow = nobs, )
   
   # define the function to be minimized
@@ -105,6 +113,8 @@ MREst.quantreg <- function(model, imp.model = NULL, mis.model = NULL, L, data)
 #' @param model The quantile regression model of interest, defined by \code{\link{def.quantreg}}.
 #' @param imp.model A list of possibly multiple lists of the form \code{list(list.1, list.2, ..., list.K)}, where \code{K} is the total number of different imputation models. For the \emph{k}-th imputation model, \code{list.k} is a list of possibly multiple models, each of which is defined by \code{\link{def.glm}} and imputes one single missing variable marginally. See details.
 #' @param mis.model A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.
+#' @param moment A vector of auxiliary variables whose moments are to be calibrated.
+#' @param order A numeric value. The order of moments to be calibrated.
 #' @param L Number of imputations.
 #' @param data A data frame with missing data encoded as \code{NA}.
 #' @param bootstrap Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the quantile regression coefficients.
@@ -118,7 +128,7 @@ MREst.quantreg <- function(model, imp.model = NULL, mis.model = NULL, L, data)
 #' \item{\code{CI}}{A Wald-type confidence interval based on \code{coefficients} and \code{SE} when \code{bootstrap = TRUE}.}
 #' \item{\code{fit}}{A fitted object inheriting from class "\code{\link[quantreg]{rq}}" on \code{model}.}
 #' @references
-#' Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. In press.
+#' Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. \strong{81}(2), 305--333.
 #' @examples
 #' # Simulated data set
 #' set.seed(123)
@@ -144,8 +154,8 @@ MREst.quantreg <- function(model, imp.model = NULL, mis.model = NULL, L, data)
 #' impY.1 <- def.glm(formula = Y ~ S, family = gaussian)
 #' impY.2 <- def.glm(formula = Y ~ S + X2, family = gaussian)
 #' # missingness probability models
-#' mis1 <- def.glm(formula = R ~ S + S ^ 2, family = binomial(link = logit))
-#' mis2 <- def.glm(formula = R ~ S ^ 2, family = binomial(link = cloglog))
+#' mis1 <- def.glm(formula = R ~ S + I(S ^ 2), family = binomial(link = logit))
+#' mis2 <- def.glm(formula = R ~ I(S ^ 2), family = binomial(link = cloglog))
 #' # this example considers the following K = 3 imputation models for imputing the missing (X1, Y)
 #' imp1 <- list(impX1.1, impY.1)
 #' imp2 <- list(impX1.1, impY.2)
@@ -155,24 +165,27 @@ MREst.quantreg <- function(model, imp.model = NULL, mis.model = NULL, L, data)
 #'                        mis.model = list(mis1, mis2), L = 10, data = dat)
 #' results$coefficients
 #' summary(results$fit)
+#' MR.quantreg(model = reg, moment = c(S, X2), order = 2, data = dat)$coefficients
 #' @export
 
-MR.quantreg <- function(model, imp.model = NULL, mis.model = NULL, L = 30, data, bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
+MR.quantreg <- function(model, imp.model = NULL, mis.model = NULL, moment = NULL, order = 1, 
+                        L = 30, data, bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
 {
-  est <- MREst.quantreg(model = model, imp.model = imp.model, mis.model = mis.model, L = L, data = data)
+  if (!is.null(moment)) moment <- as.character(substitute(moment))[-1]
+  est <- MREst.quantreg(model = model, imp.model = imp.model, mis.model = mis.model, moment = moment, order = order, L = L, data = data)
 
   # Bootstrap method for variance estimation
   if (bootstrap == TRUE){
     set.seed(bootstrap.size)
-    bbb <- function(x, model, imp.model, mis.model, L, data){
+    bbb <- function(x, model, imp.model, mis.model, moment, order, L, data){
       n <- NROW(data)
       bs.sample <- data[sample(1:n, n, replace = TRUE), ]
       while (any(colSums(is.na(bs.sample)) == n)) { bs.sample <- data[sample(1:n, n, replace = TRUE), ] }
-      b.est <- MREst.quantreg(model = model, imp.model = imp.model, mis.model = mis.model, L = L, data = bs.sample)$coefficients
+      b.est <- MREst.quantreg(model = model, imp.model = imp.model, mis.model = mis.model, moment = moment, order = order, L = L, data = bs.sample)$coefficients
       return(b.est)
     }
 
-	bs.est <- sapply(1:bootstrap.size, bbb, model = model, imp.model = imp.model, mis.model = mis.model, L = L, data = data)
+	bs.est <- sapply(1:bootstrap.size, bbb, model = model, imp.model = imp.model, mis.model = mis.model, moment = moment, order = order, L = L, data = data)
     se <- apply(bs.est, 1, sd) # bootstrap standard error
     estimate <- est$coefficients
     cilb <- estimate - qnorm(1 - alpha / 2) * se

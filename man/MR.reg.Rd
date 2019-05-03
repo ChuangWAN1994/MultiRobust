@@ -4,8 +4,9 @@
 \alias{MR.reg}
 \title{Multiply Robust Estimation for (Mean) Regression}
 \usage{
-MR.reg(model, imp.model = NULL, mis.model = NULL, L = 30, data,
-  bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
+MR.reg(model, imp.model = NULL, mis.model = NULL, moment = NULL,
+  order = 1, L = 30, data, bootstrap = FALSE, bootstrap.size = 500,
+  alpha = 0.05)
 }
 \arguments{
 \item{model}{The regression model of interest, defined by \code{\link{def.glm}}.}
@@ -13,6 +14,10 @@ MR.reg(model, imp.model = NULL, mis.model = NULL, L = 30, data,
 \item{imp.model}{A list of possibly multiple lists of the form \code{list(list.1, list.2, ..., list.K)}, where \code{K} is the total number of different imputation models. For the \emph{k}-th imputation model, \code{list.k} is a list of possibly multiple models, each of which is defined by \code{\link{def.glm}} and imputes one single missing variable marginally. See details.}
 
 \item{mis.model}{A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.}
+
+\item{moment}{A vector of auxiliary variables whose moments are to be calibrated.}
+
+\item{order}{A numeric value. The order of moments to be calibrated.}
 
 \item{L}{Number of imputations.}
 
@@ -61,8 +66,8 @@ impX1.2 <- def.glm(formula = X1 ~ S + X2, family = binomial(link = cloglog))
 impY.1 <- def.glm(formula = Y ~ S, family = gaussian)
 impY.2 <- def.glm(formula = Y ~ S + X2, family = gaussian)
 # missingness probability models
-mis1 <- def.glm(formula = R ~ S + S ^ 2, family = binomial(link = logit))
-mis2 <- def.glm(formula = R ~ S ^ 2, family = binomial(link = cloglog))
+mis1 <- def.glm(formula = R ~ S + I(S ^ 2), family = binomial(link = logit))
+mis2 <- def.glm(formula = R ~ I(S ^ 2), family = binomial(link = cloglog))
 # this example considers the following K = 3 imputation models for imputing the missing (X1, Y)
 imp1 <- list(impX1.1, impY.1)
 imp2 <- list(impX1.1, impY.2)
@@ -72,6 +77,7 @@ results <- MR.reg(model = reg, imp.model = list(imp1, imp2, imp3),
                   mis.model = list(mis1, mis2), L = 10, data = dat)
 results$coefficients
 summary(results$fit)
+MR.reg(model = reg, moment = c(S, X2), order = 2, data = dat)$coefficients
 }
 \references{
 Han, P. (2014). Multiply robust estimation in regression analysis with missing data. \emph{Journal of the American Statistical Association}, \strong{109}(507), 1159--1173.

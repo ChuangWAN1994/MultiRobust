@@ -4,8 +4,9 @@
 \alias{MR.quantreg}
 \title{Multiply Robust Estimation for Quantile Regression}
 \usage{
-MR.quantreg(model, imp.model = NULL, mis.model = NULL, L = 30, data,
-  bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
+MR.quantreg(model, imp.model = NULL, mis.model = NULL, moment = NULL,
+  order = 1, L = 30, data, bootstrap = FALSE, bootstrap.size = 500,
+  alpha = 0.05)
 }
 \arguments{
 \item{model}{The quantile regression model of interest, defined by \code{\link{def.quantreg}}.}
@@ -13,6 +14,10 @@ MR.quantreg(model, imp.model = NULL, mis.model = NULL, L = 30, data,
 \item{imp.model}{A list of possibly multiple lists of the form \code{list(list.1, list.2, ..., list.K)}, where \code{K} is the total number of different imputation models. For the \emph{k}-th imputation model, \code{list.k} is a list of possibly multiple models, each of which is defined by \code{\link{def.glm}} and imputes one single missing variable marginally. See details.}
 
 \item{mis.model}{A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.}
+
+\item{moment}{A vector of auxiliary variables whose moments are to be calibrated.}
+
+\item{order}{A numeric value. The order of moments to be calibrated.}
 
 \item{L}{Number of imputations.}
 
@@ -61,8 +66,8 @@ impX1.2 <- def.glm(formula = X1 ~ S + X2, family = binomial(link = cloglog))
 impY.1 <- def.glm(formula = Y ~ S, family = gaussian)
 impY.2 <- def.glm(formula = Y ~ S + X2, family = gaussian)
 # missingness probability models
-mis1 <- def.glm(formula = R ~ S + S ^ 2, family = binomial(link = logit))
-mis2 <- def.glm(formula = R ~ S ^ 2, family = binomial(link = cloglog))
+mis1 <- def.glm(formula = R ~ S + I(S ^ 2), family = binomial(link = logit))
+mis2 <- def.glm(formula = R ~ I(S ^ 2), family = binomial(link = cloglog))
 # this example considers the following K = 3 imputation models for imputing the missing (X1, Y)
 imp1 <- list(impX1.1, impY.1)
 imp2 <- list(impX1.1, impY.2)
@@ -72,7 +77,8 @@ results <- MR.quantreg(model = reg, imp.model = list(imp1, imp2, imp3),
                        mis.model = list(mis1, mis2), L = 10, data = dat)
 results$coefficients
 summary(results$fit)
+MR.quantreg(model = reg, moment = c(S, X2), order = 2, data = dat)$coefficients
 }
 \references{
-Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. In press.
+Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. \strong{81}(2), 305--333.
 }

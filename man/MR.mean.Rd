@@ -4,8 +4,9 @@
 \alias{MR.mean}
 \title{Multiply Robust Estimation of the Marginal Mean}
 \usage{
-MR.mean(response, reg.model = NULL, mis.model = NULL, data,
-  bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
+MR.mean(response, reg.model = NULL, mis.model = NULL, moment = NULL,
+  order = 1, data, bootstrap = FALSE, bootstrap.size = 500,
+  alpha = 0.05)
 }
 \arguments{
 \item{response}{The response variable of interest whose marginal mean is to be estimated.}
@@ -13,6 +14,10 @@ MR.mean(response, reg.model = NULL, mis.model = NULL, data,
 \item{reg.model}{A list of outcome regression models defined by \code{\link{def.glm}}.}
 
 \item{mis.model}{A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.}
+
+\item{moment}{A vector of auxiliary variables whose moments are to be calibrated.}
+
+\item{order}{A numeric value. The order of moments to be calibrated.}
 
 \item{data}{A data frame with missing data encoded as \code{NA}.}
 
@@ -26,6 +31,7 @@ MR.mean(response, reg.model = NULL, mis.model = NULL, data,
 \item{\code{mu}}{The estimated value of the marginal mean.}
 \item{\code{SE}}{The bootstrap standard error of \code{mu} when \code{bootstrap = TRUE}.}
 \item{\code{CI}}{A Wald-type confidence interval based on \code{mu} and \code{SE} when \code{bootstrap = TRUE}.}
+\item{\code{weights}}{The calibration weights if any \code{reg.model}, \code{mis.model} or \code{moment} is specified.}
 }
 \description{
 \code{MR.mean()} is used to estimate the marginal mean of a variable which is subject to missingness. Multiple missingness probability models and outcome regression models can be accommodated.
@@ -46,12 +52,13 @@ dat[R == 0, 2] <- NA
 
 # Define the outcome regression models and missingness probability models
 reg1 <- def.glm(formula = Y ~ X + exp(X), family = gaussian)
-reg2 <- def.glm(formula = Y ~ X + X ^ 2, family = gaussian)
-mis1 <- def.glm(formula = R ~ X + X ^ 2, family = binomial(link = logit))
+reg2 <- def.glm(formula = Y ~ X + I(X ^ 2), family = gaussian)
+mis1 <- def.glm(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
 mis2 <- def.glm(formula = R ~ X + exp(X), family = binomial(link = cloglog))
-est <- MR.mean(response = Y, reg.model = list(reg1, reg2), 
-               mis.model = list(mis1, mis2), data = dat)
-est$mu
+MR.mean(response = Y, reg.model = list(reg1, reg2), 
+        mis.model = list(mis1, mis2), data = dat)
+MR.mean(response = Y, moment = c(X), order = 2, data = dat)
+
 }
 \references{
 Han, P. and Wang, L. (2013). Estimation with missing data: beyond double robustness. \emph{Biometrika}, \strong{100}(2), 417--430.
