@@ -1,6 +1,7 @@
 # Functions for mean estimation
 MREst.mean <- function(response, reg.model, mis.model, moment, order, data)
 {
+  if (response == "R") stop("variable name 'R' is reserved for the missingness indicator; please change the variable 'R' in the data set to a different name")
   resp <- data[ , response]
   if (!is.numeric(resp)) stop("response variable is not numeric")
   if (all(!is.na(resp))){
@@ -21,6 +22,7 @@ MREst.mean <- function(response, reg.model, mis.model, moment, order, data)
     # names of the auxiliary variables
     aux.names <- ext.names(reg.model = reg.model, mis.model = mis.model)
     aux.names <- unique(c(aux.names, moment))
+	if (any(aux.names == "R")) stop("variable name 'R' is reserved for the missingness indicator; please change the variable 'R' in the data set to a different name")
     if (any(is.na(data[ , aux.names]))) stop("auxiliary variables being used need to be fully observed")
     data.sub <- data[ , c(response, aux.names)]
     data.sub$R <- 1 * !is.na(resp) # missingness indicator
@@ -77,12 +79,12 @@ MREst.mean <- function(response, reg.model, mis.model, moment, order, data)
 #'
 #' \code{MR.mean()} is used to estimate the marginal mean of a variable which is subject to missingness. Multiple missingness probability models and outcome regression models can be accommodated.
 #' @param response The response variable of interest whose marginal mean is to be estimated. 
-#' @param reg.model A list of outcome regression models defined by \code{\link{def.glm}}.
-#' @param mis.model A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.
+#' @param reg.model A list of outcome regression models defined by \code{\link{glm.work}}.
+#' @param mis.model A list of missingness probability models defined by \code{\link{glm.work}}. The dependent variable is always specified as \code{R}.
 #' @param moment A vector of auxiliary variables whose moments are to be calibrated.
-#' @param order A numeric value. The order of moments to be calibrated.
+#' @param order A numeric value. The order of moments up to which to be calibrated.
 #' @param data A data frame with missing data encoded as \code{NA}.
-#' @param bootstrap Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the marginal mean.
+#' @param bootstrap Logical. If \code{bootstrap = TRUE}, the bootstrap will be applied to calculate the standard error and construct a Wald confidence interval.
 #' @param bootstrap.size A numeric value. Number of bootstrap resamples generated if \code{bootstrap = TRUE}.
 #' @param alpha Significance level used to construct the 100(1 - \code{alpha})\% Wald confidence interval.
 #' @import stats
@@ -108,10 +110,10 @@ MREst.mean <- function(response, reg.model, mis.model, moment, order, data)
 #' dat[R == 0, 2] <- NA
 #'
 #' # Define the outcome regression models and missingness probability models
-#' reg1 <- def.glm(formula = Y ~ X + exp(X), family = gaussian)
-#' reg2 <- def.glm(formula = Y ~ X + I(X ^ 2), family = gaussian)
-#' mis1 <- def.glm(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
-#' mis2 <- def.glm(formula = R ~ X + exp(X), family = binomial(link = cloglog))
+#' reg1 <- glm.work(formula = Y ~ X + exp(X), family = gaussian)
+#' reg2 <- glm.work(formula = Y ~ X + I(X ^ 2), family = gaussian)
+#' mis1 <- glm.work(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
+#' mis2 <- glm.work(formula = R ~ X + exp(X), family = binomial(link = cloglog))
 #' MR.mean(response = Y, reg.model = list(reg1, reg2), 
 #'         mis.model = list(mis1, mis2), data = dat)
 #' MR.mean(response = Y, moment = c(X), order = 2, data = dat)
@@ -120,7 +122,7 @@ MREst.mean <- function(response, reg.model, mis.model, moment, order, data)
 
 # Estimating the marginal mean
 MR.mean <- function(response, reg.model = NULL, mis.model = NULL, moment = NULL, order = 1, 
-                    data, bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
+                    data, bootstrap = FALSE, bootstrap.size = 300, alpha = 0.05)
 {
   response <- as.character(substitute(response))
   if (!is.null(moment)) moment <- as.character(substitute(moment))[-1]
@@ -142,6 +144,9 @@ MR.mean <- function(response, reg.model = NULL, mis.model = NULL, moment = NULL,
     se <- sd(bs.est) # bootstrap standard error
     cilb <- est - qnorm(1 - alpha / 2) * se
     ciub <- est + qnorm(1 - alpha / 2) * se
+	names(cilb) <- "lower bound"
+	names(ciub) <- "upper bound"
+
     if (is.null(reg.model) & is.null(mis.model) & is.null(moment)) return(list(mu = est, SE = se, CI = c(cilb, ciub))) 
     else return(list(mu = est, SE = se, CI = c(cilb, ciub), weights = est.ls$weights)) 
   } else {

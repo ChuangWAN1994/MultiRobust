@@ -1,9 +1,16 @@
+def.quantreg <- function(formula, tau, weights = NULL, ...)
+{
+  mf <- match.call()
+  mf[[1L]] <- quote(quantreg::rq)  
+  mf$formula <- as.formula(formula)
+  mf$tau <- tau
+  mf$weights <- weights
+  return(mf)
+}
+
 # Estimating the quantile regression coefficients based on the imputed datasets
 beta.imp.quant <- function(model, imp.model, L, data)
 {
-  if(!requireNamespace("quantreg", quietly = TRUE))
-    stop("need CRAN package 'quantreg' for quantile regression")
-  
   K <- length(imp.model) # No. of SETS of imputation models
   betaimp <- vector(mode = "list", length = K)
   imp.data <- MI.glm(imp.model = imp.model, L = L, data = data)
@@ -18,6 +25,7 @@ beta.imp.quant <- function(model, imp.model, L, data)
 MREst.quantreg <- function(model, imp.model, mis.model, moment, order, L, data)
 {
   model.names <- all.vars(model$formula)
+  if (any(model.names == "R")) stop("variable name 'R' is reserved for the missingness indicator; please change the variable 'R' in the data set to a different name")
   if (all(!is.na(data[ , model.names]))){
     warning("no missing data")
     model$data <- data
@@ -39,7 +47,9 @@ MREst.quantreg <- function(model, imp.model, mis.model, moment, order, L, data)
   } else {
 
   var.names <- ext.names.reg(imp.model = imp.model, mis.model = mis.model)
-  data.sub <- data[ , unique(c(model.names, var.names$name.cov, var.names$name.res, moment))]
+  all.names <- unique(c(model.names, var.names$name.cov, var.names$name.res, moment))
+  if (any(all.names == "R")) stop("variable name 'R' is reserved for the missingness indicator; please change the variable 'R' in the data set to a different name")
+  data.sub <- data[ , all.names]
   n <- NROW(data.sub)
   if (length(unique(colSums(is.na(as.matrix(data.sub[ , mis.var], n, ))))) > 1)
     stop("the current package requires missingness to be simultaneous for different variables")
@@ -110,23 +120,25 @@ MREst.quantreg <- function(model, imp.model, mis.model, moment, order, L, data)
 #' Multiply Robust Estimation for Quantile Regression
 #'
 #' \code{MR.quantreg()} is used for quantile regression with missing responses and/or missing covariates. Multiple missingness probability models and imputation models are allowed.
-#' @param model The quantile regression model of interest, defined by \code{\link{def.quantreg}}.
-#' @param imp.model A list of possibly multiple lists of the form \code{list(list.1, list.2, ..., list.K)}, where \code{K} is the total number of different imputation models. For the \emph{k}-th imputation model, \code{list.k} is a list of possibly multiple models, each of which is defined by \code{\link{def.glm}} and imputes one single missing variable marginally. See details.
-#' @param mis.model A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.
+#' @param formula The \code{\link{formula}} of the linear quantile regression model of interest.
+#' @param tau A numeric value in (0,1). The quantile to be estimated.
+#' @param imp.model A list of possibly multiple lists of the form \code{list(list.1, list.2, ..., list.K)}, where \code{K} is the total number of different imputation models. For the \emph{k}-th imputation model, \code{list.k} is a list of possibly multiple models, each of which is defined by \code{\link{glm.work}} and imputes one single missing variable marginally. See details.
+#' @param mis.model A list of missingness probability models defined by \code{\link{glm.work}}. The dependent variable is always specified as \code{R}.
 #' @param moment A vector of auxiliary variables whose moments are to be calibrated.
-#' @param order A numeric value. The order of moments to be calibrated.
+#' @param order A numeric value. The order of moments up to which to be calibrated.
 #' @param L Number of imputations.
 #' @param data A data frame with missing data encoded as \code{NA}.
-#' @param bootstrap Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the quantile regression coefficients.
+#' @param bootstrap Logical. If \code{bootstrap = TRUE}, the bootstrap will be applied to calculate the standard error and construct a Wald confidence interval.
 #' @param bootstrap.size A numeric value. Number of bootstrap resamples generated if \code{bootstrap = TRUE}.
 #' @param alpha Significance level used to construct the 100(1 - \code{alpha})\% Wald confidence interval.
+#' @param ... Addition arguments for the function \code{\link[quantreg]{rq}}.
+#' @seealso \code{\link[quantreg]{rq}}.
 #' @import stats
 #' @details The function \code{MR.quantreg()} currently deals with data with one missingness pattern. When multiple variables are subject to missingness, their values are missing simultaneously. The method in Han et al. (2019) specifies an imputation model by modeling the joint distribution of the missing variables conditional on the fully observed variables. In contrast, the function \code{MR.quantreg()} specifies an imputation model by separately modeling the marginal distribution of each missing variable conditional on the fully observed variables. These marginal distribution models for different missing variables constitute one joint imputation model. Different imputation models do not need to model the marginal distribution of each missing variable differently.
 #' @return
 #' \item{\code{coefficients}}{The estimated quantile regression coefficients.}
 #' \item{\code{SE}}{The bootstrap standard error of \code{coefficients} when \code{bootstrap = TRUE}.}
 #' \item{\code{CI}}{A Wald-type confidence interval based on \code{coefficients} and \code{SE} when \code{bootstrap = TRUE}.}
-#' \item{\code{fit}}{A fitted object inheriting from class "\code{\link[quantreg]{rq}}" on \code{model}.}
 #' @references
 #' Han, P., Kong, L., Zhao, J. and Zhou, X. (2019). A general framework for quantile estimation with incomplete data. \emph{Journal of the Royal Statistical Society: Series B (Statistical Methodology)}. \strong{81}(2), 305--333.
 #' @examples
@@ -145,32 +157,33 @@ MREst.quantreg <- function(model, imp.model, mis.model, moment, order, L, data)
 #' dat <- data.frame(S, X1, X2, Y)
 #' dat[R == 0, c(2, 4)] <- NA # X1 and Y may be missing
 #' 
-#' # quantile regression model of interest
-#' reg <- def.quantreg(formula = Y ~ X1 + X2, tau = 0.75)
 #' # marginal imputation models for X1
-#' impX1.1 <- def.glm(formula = X1 ~ S, family = binomial(link = logit))
-#' impX1.2 <- def.glm(formula = X1 ~ S + X2, family = binomial(link = cloglog))
+#' impX1.1 <- glm.work(formula = X1 ~ S, family = binomial(link = logit))
+#' impX1.2 <- glm.work(formula = X1 ~ S + X2, family = binomial(link = cloglog))
 #' # marginal imputation models for Y
-#' impY.1 <- def.glm(formula = Y ~ S, family = gaussian)
-#' impY.2 <- def.glm(formula = Y ~ S + X2, family = gaussian)
+#' impY.1 <- glm.work(formula = Y ~ S, family = gaussian)
+#' impY.2 <- glm.work(formula = Y ~ S + X2, family = gaussian)
 #' # missingness probability models
-#' mis1 <- def.glm(formula = R ~ S + I(S ^ 2), family = binomial(link = logit))
-#' mis2 <- def.glm(formula = R ~ I(S ^ 2), family = binomial(link = cloglog))
+#' mis1 <- glm.work(formula = R ~ S + I(S ^ 2), family = binomial(link = logit))
+#' mis2 <- glm.work(formula = R ~ I(S ^ 2), family = binomial(link = cloglog))
 #' # this example considers the following K = 3 imputation models for imputing the missing (X1, Y)
 #' imp1 <- list(impX1.1, impY.1)
 #' imp2 <- list(impX1.1, impY.2)
 #' imp3 <- list(impX1.2, impY.1)
 #' 
-#' results <- MR.quantreg(model = reg, imp.model = list(imp1, imp2, imp3),
+#' results <- MR.quantreg(formula = Y ~ X1 + X2, tau = 0.75, imp.model = list(imp1, imp2, imp3),
 #'                        mis.model = list(mis1, mis2), L = 10, data = dat)
 #' results$coefficients
-#' summary(results$fit)
-#' MR.quantreg(model = reg, moment = c(S, X2), order = 2, data = dat)$coefficients
+#' MR.quantreg(formula = Y ~ X1 + X2, tau = 0.75, 
+#'             moment = c(S, X2), order = 2, data = dat)$coefficients
 #' @export
 
-MR.quantreg <- function(model, imp.model = NULL, mis.model = NULL, moment = NULL, order = 1, 
-                        L = 30, data, bootstrap = FALSE, bootstrap.size = 500, alpha = 0.05)
+MR.quantreg <- function(formula, tau = 0.5, imp.model = NULL, mis.model = NULL, moment = NULL, order = 1, 
+                        L = 30, data, bootstrap = FALSE, bootstrap.size = 300, alpha = 0.05, ...)
 {
+  if(!requireNamespace("quantreg", quietly = TRUE))
+    stop("need CRAN package 'quantreg' for quantile regression")
+  model <- def.quantreg(formula = formula, tau = tau, ...)
   if (!is.null(moment)) moment <- as.character(substitute(moment))[-1]
   est <- MREst.quantreg(model = model, imp.model = imp.model, mis.model = mis.model, moment = moment, order = order, L = L, data = data)
 
@@ -190,8 +203,10 @@ MR.quantreg <- function(model, imp.model = NULL, mis.model = NULL, moment = NULL
     estimate <- est$coefficients
     cilb <- estimate - qnorm(1 - alpha / 2) * se
     ciub <- estimate + qnorm(1 - alpha / 2) * se
-    list(coefficients = estimate, SE = se, CI = cbind(cilb, ciub), fit = est)
+	CI <- cbind(cilb, ciub)
+	colnames(CI) <- c("lower bound", "upper bound")
+    list(coefficients = estimate, SE = se, CI = CI)
   }
 
-  else { list(coefficients = est$coefficients, fit = est) }
+  else { list(coefficients = est$coefficients) }
 }

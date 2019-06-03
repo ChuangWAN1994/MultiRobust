@@ -6,26 +6,26 @@
 \usage{
 MR.quantile(response, tau = 0.5, imp.model = NULL, mis.model = NULL,
   moment = NULL, order = 1, L = 30, data, bootstrap = FALSE,
-  bootstrap.size = 500, alpha = 0.05)
+  bootstrap.size = 300, alpha = 0.05)
 }
 \arguments{
 \item{response}{The response variable of interest whose marginal quantile is to be estimated.}
 
 \item{tau}{A numeric value in (0,1). The quantile to be estimated.}
 
-\item{imp.model}{A list of imputation models defined by \code{\link{def.glm}}.}
+\item{imp.model}{A list of imputation models defined by \code{\link{glm.work}}.}
 
-\item{mis.model}{A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.}
+\item{mis.model}{A list of missingness probability models defined by \code{\link{glm.work}}. The dependent variable is always specified as \code{R}.}
 
 \item{moment}{A vector of auxiliary variables whose moments are to be calibrated.}
 
-\item{order}{A numeric value. The order of moments to be calibrated.}
+\item{order}{A numeric value. The order of moments up to which to be calibrated.}
 
 \item{L}{Number of imputations.}
 
 \item{data}{A data frame with missing data encoded as \code{NA}.}
 
-\item{bootstrap}{Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the estimated marginal quantile.}
+\item{bootstrap}{Logical. If \code{bootstrap = TRUE}, the bootstrap will be applied to calculate the standard error and construct a Wald confidence interval.}
 
 \item{bootstrap.size}{A numeric value. Number of bootstrap resamples generated if \code{bootstrap = TRUE}.}
 
@@ -55,10 +55,10 @@ dat <- data.frame(X, Y)
 dat[R == 0, 2] <- NA
 
 # Define the outcome regression models and missingness probability models
-imp1 <- def.glm(formula = Y ~ X + exp(X), family = gaussian)
-imp2 <- def.glm(formula = Y ~ X + I(X ^ 2), family = gaussian)
-mis1 <- def.glm(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
-mis2 <- def.glm(formula = R ~ X + exp(X), family = binomial(link = cloglog))
+imp1 <- glm.work(formula = Y ~ X + exp(X), family = gaussian)
+imp2 <- glm.work(formula = Y ~ X + I(X ^ 2), family = gaussian)
+mis1 <- glm.work(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
+mis2 <- glm.work(formula = R ~ X + exp(X), family = binomial(link = cloglog))
 MR.quantile(response = Y, tau = 0.25, imp.model = list(imp1, imp2),
             mis.model = list(mis1, mis2), L = 10, data = dat)
 MR.quantile(response = Y, tau = 0.25, moment = c(X), order = 2, data = dat)

@@ -5,23 +5,23 @@
 \title{Multiply Robust Estimation of the Marginal Mean}
 \usage{
 MR.mean(response, reg.model = NULL, mis.model = NULL, moment = NULL,
-  order = 1, data, bootstrap = FALSE, bootstrap.size = 500,
+  order = 1, data, bootstrap = FALSE, bootstrap.size = 300,
   alpha = 0.05)
 }
 \arguments{
 \item{response}{The response variable of interest whose marginal mean is to be estimated.}
 
-\item{reg.model}{A list of outcome regression models defined by \code{\link{def.glm}}.}
+\item{reg.model}{A list of outcome regression models defined by \code{\link{glm.work}}.}
 
-\item{mis.model}{A list of missingness probability models defined by \code{\link{def.glm}}. The dependent variable is always specified as \code{R}.}
+\item{mis.model}{A list of missingness probability models defined by \code{\link{glm.work}}. The dependent variable is always specified as \code{R}.}
 
 \item{moment}{A vector of auxiliary variables whose moments are to be calibrated.}
 
-\item{order}{A numeric value. The order of moments to be calibrated.}
+\item{order}{A numeric value. The order of moments up to which to be calibrated.}
 
 \item{data}{A data frame with missing data encoded as \code{NA}.}
 
-\item{bootstrap}{Logical. Should a bootstrap method be applied to calculate the standard error of the estimator and construct a Wald confidence interval for the marginal mean.}
+\item{bootstrap}{Logical. If \code{bootstrap = TRUE}, the bootstrap will be applied to calculate the standard error and construct a Wald confidence interval.}
 
 \item{bootstrap.size}{A numeric value. Number of bootstrap resamples generated if \code{bootstrap = TRUE}.}
 
@@ -51,10 +51,10 @@ dat <- data.frame(X, Y)
 dat[R == 0, 2] <- NA
 
 # Define the outcome regression models and missingness probability models
-reg1 <- def.glm(formula = Y ~ X + exp(X), family = gaussian)
-reg2 <- def.glm(formula = Y ~ X + I(X ^ 2), family = gaussian)
-mis1 <- def.glm(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
-mis2 <- def.glm(formula = R ~ X + exp(X), family = binomial(link = cloglog))
+reg1 <- glm.work(formula = Y ~ X + exp(X), family = gaussian)
+reg2 <- glm.work(formula = Y ~ X + I(X ^ 2), family = gaussian)
+mis1 <- glm.work(formula = R ~ X + I(X ^ 2), family = binomial(link = logit))
+mis2 <- glm.work(formula = R ~ X + exp(X), family = binomial(link = cloglog))
 MR.mean(response = Y, reg.model = list(reg1, reg2), 
         mis.model = list(mis1, mis2), data = dat)
 MR.mean(response = Y, moment = c(X), order = 2, data = dat)

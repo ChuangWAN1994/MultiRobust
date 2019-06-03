@@ -8,13 +8,14 @@
 #' @seealso \code{\link{glm}}.
 #' @examples
 #' # A logistic regression with response R and covariates X1 and X2
-#' mis1 <- def.glm(formula = R ~ X1 + X2, family = binomial(link = logit))
+#' mis1 <- glm.work(formula = R ~ X1 + X2, family = binomial(link = logit))
 #' @export
-def.glm <- function(formula, family = gaussian, weights = NULL, ...)
+glm.work <- function(formula, family = gaussian, weights = NULL, ...)
 {
   mf <- match.call()
-  mf[[1L]] <- quote(glm)  # paste "glm" in the formula
-  mf$formula <- substitute(formula) # avoid using the quotation marks in the formula
+  mf[[1L]] <- quote(glm)
+  mf$formula <- as.formula(formula)
+  mf$family <- family
   mf$weights <- weights
   return(mf)
 }
